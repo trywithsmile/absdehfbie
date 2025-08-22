@@ -1,97 +1,33 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Bot token environment variable se lein
-const TOKEN = process.env.BOT_TOKEN;
-const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
+// Temporary hardcoded token - BAAD MEIN HATA DENGE
+const TOKEN = process.env.BOT_TOKEN || "7127937231:AAEoq1vO2C5CjJePVqKjK6JqkqYqX2aXJ9c";
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "your_channel_username";
 
-// Bot initialize karein
-const bot = new TelegramBot(TOKEN, { polling: true });
+console.log("Using token:", TOKEN ? "Present" : "Missing");
 
-console.log('Bot started successfully!');
+if (!TOKEN) {
+  console.error('ERROR: BOT_TOKEN environment variable not set!');
+  console.error('Please set BOT_TOKEN in Railway dashboard');
+  process.exit(1);
+}
 
-// Processed media groups ko track karne ke liye
-const processedMediaGroups = new Set();
+try {
+  const bot = new TelegramBot(TOKEN, { polling: true });
+  console.log('Bot started successfully with token!');
 
-// Start command handle karein
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const welcomeMessage = '🤖 *Image Link Bot*\n\nI automatically add channel links to image captions in your private channel.\n\n*How to use:*\n1. Add me to your channel as admin\n2. Give me permission to send messages\n3. I\'ll automatically add links to all images\n\n*Commands:*\n/start - Start the bot\n/help - Show help information';
-  
-  bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
-});
+  // Simple test command
+  bot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, 'Bot is working! Token is correct.');
+  });
 
-// Help command handle karein
-bot.onText(/\/help/, (msg) => {
-  const chatId = msg.chat.id;
-  const helpMessage = '*Need help?*\n\nJust add me to your channel as administrator with permission to send messages. I\'ll automatically handle the rest!\n\nMake sure I have the right permissions in your channel.';
-  
-  bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
-});
+  bot.on('message', (msg) => {
+    console.log('Received message:', msg.text);
+  });
 
-// Photos process karein
-bot.on('photo', async (msg) => {
-  try {
-    // Sirf channels ke messages process karein
-    if (msg.chat.type !== 'channel') return;
-    
-    // Media groups ko avoid karein
-    if (msg.media_group_id && processedMediaGroups.has(msg.media_group_id)) return;
-    
-    // Bot ke admin status ko check karein
-    try {
-      const botMember = await bot.getChatMember(msg.chat.id, (await bot.getMe()).id);
-      if (!['creator', 'administrator'].includes(botMember.status)) {
-        console.log('Bot is not admin in channel:', msg.chat.title);
-        return;
-      }
-    } catch (error) {
-      console.log('Bot is not in channel:', msg.chat.title);
-      return;
-    }
-    
-    // Media group ko mark karein
-    if (msg.media_group_id) {
-      processedMediaGroups.add(msg.media_group_id);
-      setTimeout(() => {
-        processedMediaGroups.delete(msg.media_group_id);
-      }, 10000);
-    }
-    
-    // Highest quality photo lein
-    const photo = msg.photo[msg.photo.length - 1];
-    const fileId = photo.file_id;
-    
-    // Channel link banayein
-    const channelLink = `https://t.me/${CHANNEL_USERNAME}/${msg.message_id}`;
-    
-    // Caption banayein ya modify karein
-    let newCaption = msg.caption || '';
-    newCaption = newCaption ? `${newCaption}\n\n🔗 ${channelLink}` : `🔗 ${channelLink}`;
-    
-    // Naya message bhejein
-    await bot.sendPhoto(msg.chat.id, fileId, {
-      caption: newCaption,
-      reply_to_message_id: msg.message_id
-    });
-    
-    // Original message delete karein
-    try {
-      await bot.deleteMessage(msg.chat.id, msg.message_id);
-    } catch (error) {
-      console.log('Cannot delete message:', error.message);
-    }
-    
-  } catch (error) {
-    console.error('Error processing photo:', error);
-  }
-});
+  console.log('Bot is ready and listening...');
 
-// Error handling
-bot.on('error', (error) => {
-  console.error('Bot error:', error);
-});
-
-// Unhandled errors
-process.on('unhandledRejection', (error) => {
-  console.error('Unhandled error:', error);
-});
+} catch (error) {
+  console.error('Failed to initialize bot:', error);
+}
